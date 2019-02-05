@@ -22,12 +22,6 @@ def loadData():
         trainData, trainTarget = Data[:3500], Target[:3500]
         validData, validTarget = Data[3500:3600], Target[3500:3600]
         testData, testTarget = Data[3600:], Target[3600:]
-        #print(trainData.shape) #(3500,28,28)
-        #print(validData.shape) #(100,28,28)
-        #print(testData.shape) #(145,28,28)
-        #print(trainTarget.shape) #(3500,1)
-        #print(validTarget.shape) #(100,1)
-        #print(testTarget.shape) #145,1)
     return trainData, validData, testData, trainTarget, validTarget, testTarget
 
 trainData, validData, testData, trainTarget, validTarget, testTarget = loadData()
@@ -195,54 +189,97 @@ def ModelTest(W,b,testData,testTarget,lossType=None):
 accurary, y_predict = ModelTest(W_optimal,b_optimal,testData,testTarget, "CE")
 
 #%% buildGraph and SGD
-def buildGraph(lossType=None):
-    # Your implementation here
-    tf.set_random_seed(421)
+def buildGraph(beta1=None, beta2=None, epsilon=None, lossType=None, learning_rate=None):
+    # Your implementation here    
+    #Reset to defaultgraph
+    tf.reset_default_graph()
     
     #Initialize Parameters
     learning_rate = 0.001
-    iterations = 700
     batch = 500 
-    d = np.shape(testData.shape[1]*testData.shape[2])
-    regularization = 0
+    d = testData.shape[1]*testData.shape[2]
+    Lambda = 0
     
-    #Initialize X,Y, weight and bias, reg
+    #Initialize Placeholders and Constants
     X = tf.placeholder("float")
     Y = tf.placeholder("float")
+    reg = tf.constant(Lambda, name = "Lambda")
     
-    W = tf.random.truncated_normal(shape=(batch,d),stddev=0.5,seed=421,name = "Weight")
-    b = tf.random.truncated_normal(shape=(1,1),stddev=0.5,seed=421,name = "Bias")
-    reg = tf.constant()
+    #Initialize Variables
+    tf.set_random_seed(421)
+    W = tf.get_variable(initializer = tf.truncated_normal((d,1),stddev=0.5,seed=421),name = "Weight")
+    b = tf.get_variable(initializer = tf.truncated_normal((1,1),stddev=0.5,seed=421),name = "Bias")
+    
     
     #Initialize Prediction Model and Loss function
     if (lossType == "MSE"):
-        pred = tf.add(tf.multiply(X, W), b)
+        pred = tf.add(tf.matmul(X, W), b)
         loss = tf.losses.mean_squared_error(labels=Y,predictions=pred)
+        correct_prediction = tf.equal(tf.round(pred), Y)
+        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
         
         
     elif(lossType == "CE"):
-        pred = tf.sigmoid(tf.add(tf.multiply(X, W), b))
-        loss = tf.losses.sigmoid_cross_entropy(labes=Y,predicitons=pred)
+        logit =tf.add(tf.matmul(X, W), b)
+        pred = tf.sigmoid(logit)
+        loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=Y,logits=logit))
+        correct_prediction = tf.equal(tf.round(pred), Y)
+        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     
     #Initiaze optimizer
-    optimizer = tf.train.AdamOptimizer(learning_rate)
+    optimizer = tf.train.AdamOptimizer(learning_rate,name="ADAM").minimize(loss)
         
-    #Initialize the variables
-    init = tf.global_variables_initializer()
+    return W, b, pred, X, Y, loss, accuracy, optimizer, reg 
+#%%SGD Implementation
+def SGD(batchSize,iterations):
+    #Load and Reshape Data
+    trainData, validData, testData, trainTarget, validTarget, testTarget = loadData()
+    d = trainData.shape[1]*trainData.shape[2]
+    trainData = np.reshape(trainData,(trainData.shape[0],d))
+    validData = np.reshape(validData,(validData.shape[0],d))
+    testData = np.reshape(testData,(testData.shape[0],d))
+    
+    #Caluclate # of Batchs
+    batches = trainData.shape[0]/batchSize
+    
+    #Initiate Variables
+    W, b, pred, X, Y, loss, accuracy, optimizer, reg  = buildGraph(beta1=0.9, beta2=0.999, epsilon=1e-08, lossType="CE", learning_rate=0.001)
+    trainLoss,trainAcc,validLoss,validAcc,testLoss,testAcc = ([] for i in range(6))
     
     #Start Training Session
     with tf.Session() as sess:
         #Run the initializer
+        init = tf.global_variables_initializer()
         sess.run(init)
         
         for epoch in range(iterations):
-            for (x, y) in (testData, targetData):
-                sess.run(optimizer.minimize(loss), feed_dict={X: trainData, Y: trainTarget})
-                if (epoch+1) % 50 == 0:
-                    #print epoch and Loss
-                    current_loss = sess.run(loss, feed_dict={X: trainData, Y: trainTarget})
-                    print("Epoch: ",epoch, "Loss= ",current_loss)
-
-#%%SGD Implementation
-
-def SGD()
+            #Create mini-batches
+            rand_int = np.random.choice(trainData.shape[0],size=batchSize)
+            x_batch = np.empty((batchSize,d))
+            y_batch = np.empty((batchSize,1))
+            for i in range(batchSize):
+                index = rand_int[i]
+                x_batch[i] = trainData[index]
+                y_batch[i] = trainTarget[index]
+            
+            #Run sessions and store losses
+            _,temp_trainLoss,temp_trainAcc = sess.run([optimizer,loss,accuracy], feed_dict={X: x_batch, Y: y_batch})
+            trainLoss.append(temp_trainLoss)
+            trainAcc.append(temp_trainAcc)
+            print("Epoch: {0}, train loss: {1:.2f}, train accuracy: {2:.01%}". format(i + 1, temp_trainLoss, temp_trainAcc))
+            
+            temp_validLoss,temp_validAcc = sess.run([loss,accuracy], feed_dict={X: validData, Y: validTarget})
+            validLoss.append(temp_validLoss)
+            validAcc.append(temp_validAcc)
+            
+            temp_testLoss,temp_testAcc = sess.run([loss,accuracy], feed_dict={X: testData, Y: testTarget})
+            testLoss.append(temp_testLoss)
+            testAcc.append(temp_testAcc)
+            
+            #Save Session
+                        
+        print("Optimization finished!")
+        return trainLoss, validLoss, testLoss, trainAcc, validAcc, testAcc
+        
+#%%SGD Testing
+    SGD_trainLoss,SGD_validLoss, SGD_testLoss, SGD_trainAcc, SGD_validAcc, SGD_testAcc= SGD(500,700)
