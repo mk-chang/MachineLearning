@@ -86,12 +86,6 @@ def gradMSE(W, b, x, y, reg):
 def sigmoid(W,x_i,b):
     return 1/(1+np.exp(-np.dot(x_i,W)-b))
 
-def grad_sigmoid(W,x_i,b):
-    grad_sigmoid_b = np.square(sigmoid(W,x_i,b))*np.exp(-np.dot(x_i,W)-b)
-    grad_sigmoid_w = grad_sigmoid_b*x_i
-    
-    return grad_sigmoid_w, grad_sigmoid_b
-
 def crossEntropyLoss(W, b, x, y, reg):
     # Your implementation here
     N = len(y)
@@ -100,7 +94,7 @@ def crossEntropyLoss(W, b, x, y, reg):
     W = W.flatten()
     for i in range(N):
         y_output = sigmoid(W,x[i],b)
-        loss += -y[i]*np.log(y_output)-(1-y[i])*np.log(1-y_output) 
+        loss -= y[i]*np.log(y_output)+(1-y[i])*np.log(1-y_output) 
     loss *= 1/N
     
     #Regularization
@@ -117,10 +111,9 @@ def gradCE(W, b, x, y, reg):
     x = np.reshape(x,(N,x.shape[1]*x.shape[2]))
     W = W.flatten()
     for i in range(N):
-        grad_sigmoid_W,grad_sigmoid_b = grad_sigmoid(W,x[i],b)
         y_output=sigmoid(W,x[i],b)
-        grad_W += -y[i]*grad_sigmoid_W/y_output + (1-y[i])*grad_sigmoid_W/(1-y_output)#grad_w = 1xd array
-        grad_b += -y[i]*grad_sigmoid_b/y_output + (1-y[i])*grad_sigmoid_b/(1-y_output)#grad_b = 1x1
+        grad_b += y_output-y[i]
+        grad_W += grad_b*x[i]
     grad_W *= 1/N
     grad_W += reg*W
     
@@ -137,11 +130,11 @@ def gradCE(W, b, x, y, reg):
     
     
 #%% Gradient Descent
-def grad_descent(W, b, trainingData, trainingLabels, alpha, epochs, reg, EPS, lossType=None):
+def grad_descent(W, b, trainingData, trainingLabels, alpha, iteration, reg, EPS, lossType=None):
     # Your implementation here
     prev_W = np.ones_like(W)
     if (lossType == "MSE"):
-        for t in range(epochs):
+        for epoch in range(iteration):
             loss = MSE(W,b,testData,testTarget,reg)
             delta_W = LA.norm(W-prev_W)
             print("Delta W = "+str(delta_W)+" Loss = "+str(loss)+'\n')
@@ -155,7 +148,7 @@ def grad_descent(W, b, trainingData, trainingLabels, alpha, epochs, reg, EPS, lo
         return W, b
             
     elif (lossType == "CE"):
-        for t in range(epochs):
+        for epoch in range(iteration):
             loss = crossEntropyLoss(W,b,testData,testTarget,reg)
             delta_W = LA.norm(W-prev_W)
             print("Delta W = "+str(delta_W)+" Loss = "+str(loss)+'\n')
@@ -177,20 +170,79 @@ def grad_descent(W, b, trainingData, trainingLabels, alpha, epochs, reg, EPS, lo
     reg = 0 
     EPS = 10e-7 # 1x10^-7
     W_optimal,b_optimal = grad_descent(W, b, trainData, trainData, alpha, epochs, reg, EPS,"CE")
-#%% Model Test
+
+def ModelTest(W,b,testData,testTarget,lossType=None):
     correct=0
     N = len(testData)
     d = testData.shape[1]*testData.shape[2]
     x_test = np.reshape(testData,(N,d))
     y_predict=np.empty(N)
-    for i in range(N):
-        y_predict[i] = np.dot(W_optimal,x_test[i])+b_optimal
-        if(abs(y_predict[i] - testTarget[i])<0.5):
-            correct+=1
+    if (lossType == "MSE"):
+        for i in range(N):
+            y_predict[i] = np.dot(W,x_test[i])+b
+            if(abs(y_predict[i] - testTarget[i])<0.5):
+                correct+=1
+    elif (lossType == "CE"):
+        for i in range(N):
+            y_predict[i] = sigmoid(W,x_test[i],b)
+            if(abs(y_predict[i] - testTarget[i])<0.05):
+                correct+=1
+        
     print("The Model is "+str(100*correct/N)+"% accurate.\n")
     
-#%% buildGraph
-def buildGraph(beta1=None, beta2=None, epsilon=None, lossType=None, learning_rate=None):
-    # Your implementation here
-    print("Not implemented")
+    return 100*correct/N, y_predict
 
+accurary, y_predict = ModelTest(W_optimal,b_optimal,testData,testTarget, "CE")
+
+#%% buildGraph and SGD
+def buildGraph(lossType=None):
+    # Your implementation here
+    tf.set_random_seed(421)
+    
+    #Initialize Parameters
+    learning_rate = 0.001
+    iterations = 700
+    batch = 500 
+    d = np.shape(testData.shape[1]*testData.shape[2])
+    regularization = 0
+    
+    #Initialize X,Y, weight and bias, reg
+    X = tf.placeholder("float")
+    Y = tf.placeholder("float")
+    
+    W = tf.random.truncated_normal(shape=(batch,d),stddev=0.5,seed=421,name = "Weight")
+    b = tf.random.truncated_normal(shape=(1,1),stddev=0.5,seed=421,name = "Bias")
+    reg = tf.constant()
+    
+    #Initialize Prediction Model and Loss function
+    if (lossType == "MSE"):
+        pred = tf.add(tf.multiply(X, W), b)
+        loss = tf.losses.mean_squared_error(labels=Y,predictions=pred)
+        
+        
+    elif(lossType == "CE"):
+        pred = tf.sigmoid(tf.add(tf.multiply(X, W), b))
+        loss = tf.losses.sigmoid_cross_entropy(labes=Y,predicitons=pred)
+    
+    #Initiaze optimizer
+    optimizer = tf.train.AdamOptimizer(learning_rate)
+        
+    #Initialize the variables
+    init = tf.global_variables_initializer()
+    
+    #Start Training Session
+    with tf.Session() as sess:
+        #Run the initializer
+        sess.run(init)
+        
+        for epoch in range(iterations):
+            for (x, y) in (testData, targetData):
+                sess.run(optimizer.minimize(loss), feed_dict={X: trainData, Y: trainTarget})
+                if (epoch+1) % 50 == 0:
+                    #print epoch and Loss
+                    current_loss = sess.run(loss, feed_dict={X: trainData, Y: trainTarget})
+                    print("Epoch: ",epoch, "Loss= ",current_loss)
+
+#%%SGD Implementation
+
+def SGD()
