@@ -2,7 +2,7 @@
 import tensorflow as tf
 import numpy as np 
 from numpy import linalg as LA
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 #%% Load Data
 def loadData():
@@ -162,7 +162,7 @@ def grad_descent(W, b, trainingData, trainingLabels, alpha, iteration, reg, EPS,
     alpha = 0.001
     epochs = 5000
     reg = 0 
-    EPS = 10e-7 # 1x10^-7
+    EPS = 1e-7 # 1x10^-7
     W_optimal,b_optimal = grad_descent(W, b, trainData, trainData, alpha, epochs, reg, EPS,"CE")
 
 def ModelTest(W,b,testData,testTarget,lossType=None):
@@ -227,11 +227,11 @@ def buildGraph(beta1=None, beta2=None, epsilon=None, lossType=None, learning_rat
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     
     #Initiaze optimizer
-    optimizer = tf.train.AdamOptimizer(learning_rate,name="ADAM").minimize(loss)
+    optimizer = tf.train.AdamOptimizer(learning_rate,epsilon = 1e-9, name='ADAM').minimize(loss)
         
     return W, b, pred, X, Y, loss, accuracy, optimizer, reg 
 #%%SGD Implementation
-def SGD(batchSize,iterations):
+def SGD(batchSize,iterations,lossType=None):
     #Load and Reshape Data
     trainData, validData, testData, trainTarget, validTarget, testTarget = loadData()
     d = trainData.shape[1]*trainData.shape[2]
@@ -243,7 +243,11 @@ def SGD(batchSize,iterations):
     batches = trainData.shape[0]/batchSize
     
     #Initiate Variables
-    W, b, pred, X, Y, loss, accuracy, optimizer, reg  = buildGraph(beta1=0.9, beta2=0.999, epsilon=1e-08, lossType="CE", learning_rate=0.001)
+    if (lossType == "MSE"):
+        W, b, pred, X, Y, loss, accuracy, optimizer, reg  = buildGraph(beta1=0.9, beta2=0.999, epsilon=1e-08, lossType="MSE", learning_rate=0.001)
+    elif (lossType == "CE"):
+        W, b, pred, X, Y, loss, accuracy, optimizer, reg  = buildGraph(beta1=0.9, beta2=0.999, epsilon=1e-08, lossType="CE", learning_rate=0.001)
+        
     trainLoss,trainAcc,validLoss,validAcc,testLoss,testAcc = ([] for i in range(6))
     
     #Start Training Session
@@ -276,10 +280,40 @@ def SGD(batchSize,iterations):
             testLoss.append(temp_testLoss)
             testAcc.append(temp_testAcc)
             
-            #Save Session
-                        
+        #Save Session`
+        W_optimal, b_optimal = sess.run([W,b], feed_dict={X: testData, Y: testTarget})
+        
         print("Optimization finished!")
-        return trainLoss, validLoss, testLoss, trainAcc, validAcc, testAcc
+        return W_optimal, b_optimal, trainLoss, validLoss, testLoss, trainAcc, validAcc, testAcc
         
 #%%SGD Testing
-    SGD_trainLoss,SGD_validLoss, SGD_testLoss, SGD_trainAcc, SGD_validAcc, SGD_testAcc= SGD(500,700)
+    #Run SGD algorithm
+    epochs = 700
+    batchSize = 500
+    lossType = "MSE"
+    W_optimal,b_optimal, SGD_trainLoss,SGD_validLoss, SGD_testLoss, SGD_trainAcc, SGD_validAcc, SGD_testAcc= SGD(batchSize,epochs,lossType)
+   
+    #Plot SGD results
+    x_axis = np.arange(epochs)+1
+    
+    plt.figure(figsize=(10,5))
+    
+    plt.subplot(211)
+    plt.plot(x_axis,SGD_trainLoss,color='c',linewidth=2.0,label="Training")
+    plt.plot(x_axis,SGD_validLoss,color='b',linewidth=2.0,label="Validation")
+    plt.plot(x_axis, SGD_testLoss,color='g',linewidth=2.0,label="Test")
+    plt.ylabel('Loss')
+    plt.xlabel('Epochs')
+    plt.title("Stoichastic Gradient Descent to Minimize " + lossType)
+    plt.legend()
+
+    
+    plt.subplot(212)
+    plt.plot(x_axis,SGD_trainAcc,color='c',linewidth=2.0,label="Training")
+    plt.plot(x_axis,SGD_validAcc,color='b',linewidth=2.0,label="Validation")
+    plt.plot(x_axis, SGD_testAcc,color='g',linewidth=2.0,label="Test")
+    plt.ylabel('Accuracy')
+    plt.xlabel('Epochs')
+    plt.legend()
+    
+    plt.show()
