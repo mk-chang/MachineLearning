@@ -158,36 +158,32 @@ def grad_descent(W, b, trainingData, trainingLabels, alpha, iteration, reg, EPS,
      
 #%% Gradient Descent Test
     W = np.zeros(trainData.shape[1]*trainData.shape[2])
-    b = 0 
+    b = 1
     alpha = 0.001
     epochs = 5000
     reg = 0 
     EPS = 1e-7 # 1x10^-7
-    W_optimal,b_optimal = grad_descent(W, b, trainData, trainData, alpha, epochs, reg, EPS,"CE")
+    lossType = "CE"
+    W_optimal,b_optimal = grad_descent(W, b, trainData, trainData, alpha, epochs, reg, EPS,lossType)
 
-def ModelTest(W,b,testData,testTarget,lossType=None):
-    correct=0
     N = len(testData)
     d = testData.shape[1]*testData.shape[2]
     x_test = np.reshape(testData,(N,d))
     y_predict=np.empty(N)
+    correct=0
     if (lossType == "MSE"):
         for i in range(N):
             y_predict[i] = np.dot(W,x_test[i])+b
-            if(abs(y_predict[i] - testTarget[i])<0.5):
+            if(round(y_predict[i]) - testTarget[i]==0):
                 correct+=1
     elif (lossType == "CE"):
         for i in range(N):
             y_predict[i] = sigmoid(W,x_test[i],b)
-            if(abs(y_predict[i] - testTarget[i])<0.05):
+            if(round(y_predict[i]) - testTarget[i]==0):
                 correct+=1
-        
-    print("The Model is "+str(100*correct/N)+"% accurate.\n")
     
-    return 100*correct/N, y_predict
-
-accurary, y_predict = ModelTest(W_optimal,b_optimal,testData,testTarget, "CE")
-
+    accuracy = 100*correct/N
+    print("The Model is "+str(accuracy)+"% accurate.\n")
 #%% buildGraph and SGD
 def buildGraph(beta1=None, beta2=None, epsilon=None, lossType=None, learning_rate=None):
     # Your implementation here    
@@ -196,7 +192,6 @@ def buildGraph(beta1=None, beta2=None, epsilon=None, lossType=None, learning_rat
     
     #Initialize Parameters
     learning_rate = 0.001
-    batch = 500 
     d = testData.shape[1]*testData.shape[2]
     Lambda = 0
     
@@ -227,7 +222,7 @@ def buildGraph(beta1=None, beta2=None, epsilon=None, lossType=None, learning_rat
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     
     #Initiaze optimizer
-    optimizer = tf.train.AdamOptimizer(learning_rate,epsilon = 1e-9, name='ADAM').minimize(loss)
+    optimizer = tf.train.AdamOptimizer(learning_rate, name='ADAM').minimize(loss)
         
     return W, b, pred, X, Y, loss, accuracy, optimizer, reg 
 #%%SGD Implementation
@@ -270,7 +265,7 @@ def SGD(batchSize,iterations,lossType=None):
             _,temp_trainLoss,temp_trainAcc = sess.run([optimizer,loss,accuracy], feed_dict={X: x_batch, Y: y_batch})
             trainLoss.append(temp_trainLoss)
             trainAcc.append(temp_trainAcc)
-            print("Epoch: {0}, train loss: {1:.2f}, train accuracy: {2:.01%}". format(i + 1, temp_trainLoss, temp_trainAcc))
+            print("Epoch: {0}, train loss: {1:.2f}, train accuracy: {2:.01%}". format(epoch + 1, temp_trainLoss, temp_trainAcc))
             
             temp_validLoss,temp_validAcc = sess.run([loss,accuracy], feed_dict={X: validData, Y: validTarget})
             validLoss.append(temp_validLoss)
@@ -288,7 +283,7 @@ def SGD(batchSize,iterations,lossType=None):
         
 #%%SGD Testing
     #Run SGD algorithm
-    epochs = 700
+    epochs = 5000
     batchSize = 500
     lossType = "MSE"
     W_optimal,b_optimal, SGD_trainLoss,SGD_validLoss, SGD_testLoss, SGD_trainAcc, SGD_validAcc, SGD_testAcc= SGD(batchSize,epochs,lossType)
@@ -296,7 +291,7 @@ def SGD(batchSize,iterations,lossType=None):
     #Plot SGD results
     x_axis = np.arange(epochs)+1
     
-    plt.figure(figsize=(10,5))
+    plt.figure(figsize=(10,10))
     
     plt.subplot(211)
     plt.plot(x_axis,SGD_trainLoss,color='c',linewidth=2.0,label="Training")
