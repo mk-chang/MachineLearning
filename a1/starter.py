@@ -38,15 +38,12 @@ def MSE(W, b, x, y, reg):
     
     #Convert x into 2D matrix (Nxd)
     x = np.reshape(x,(N,d))
-    #W = np.reshape(W,(d,1))
-    #loss = LA.norm(np.dot(x,W)+b-y)
     W = W.flatten()
     for i in range(N):
         loss += np.square(np.dot(W,x[i])+b-y[i]) #x[i:1] is row vector, x = 1xd
     loss *= 1/(2*N)
     
     #Regularization
-    #regular = reg/2*np.square(LA.norm(W))
     regular = reg/2*np.dot(W,W)
     
     #Return Total Loss
@@ -124,26 +121,26 @@ def gradCE(W, b, x, y, reg):
     
     
 #%% Gradient Descent
-def grad_descent(W, b, trainingData, trainingLabels, alpha, iteration, reg, EPS, lossType=None):
+def grad_descent(W, b, Data, Target, alpha, iteration, reg, EPS, lossType=None):
     # Your implementation here
     prev_W = np.ones_like(W)
     if (lossType == "MSE"):
         for epoch in range(iteration):
-            loss = MSE(W,b,testData,testTarget,reg)
+            loss = MSE(W,b,Data,Target,reg)
             delta_W = LA.norm(W-prev_W)
             print("Delta W = "+str(delta_W)+" Loss = "+str(loss)+'\n')
             if (delta_W <= EPS):
                 return W,b
             else:
                 prev_W = np.copy(W)
-                grad_W, grad_b = gradMSE(W,b,testData,testTarget,reg)
+                grad_W, grad_b = gradMSE(W,b,Data,Target,reg)
                 W -= alpha*grad_W
                 b -= alpha*grad_b
         return W, b
             
     elif (lossType == "CE"):
         for epoch in range(iteration):
-            loss = crossEntropyLoss(W,b,testData,testTarget,reg)
+            loss = crossEntropyLoss(W,b,Data,Target,reg)
             delta_W = LA.norm(W-prev_W)
             print("Delta W = "+str(delta_W)+" Loss = "+str(loss)+'\n')
             if (delta_W <= EPS):
@@ -151,7 +148,7 @@ def grad_descent(W, b, trainingData, trainingLabels, alpha, iteration, reg, EPS,
             
             else:
                 prev_W = np.copy(W)
-                grad_W, grad_b = gradCE(W,b,testData,testTarget,reg)
+                grad_W, grad_b = gradCE(W,b,Data,Target,reg)
                 W -= alpha*grad_W
                 b -= alpha*grad_b
         return W, b
@@ -235,7 +232,7 @@ def SGD(batchSize,iterations,lossType=None):
     testData = np.reshape(testData,(testData.shape[0],d))
     
     #Caluclate # of Batchs
-    batches = trainData.shape[0]/batchSize
+    batches = trainData.shape[0]//batchSize
     
     #Initiate Variables
     if (lossType == "MSE"):
