@@ -1,6 +1,5 @@
 import tensorflow as tf
 
-
 def reduce_logsumexp(input_tensor, reduction_indices=1, keep_dims=False):
   """Computes the sum of elements across dimensions of a tensor in log domain.
 
