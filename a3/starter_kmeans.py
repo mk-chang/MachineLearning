@@ -76,15 +76,15 @@ with tf.Session() as sess:
     print("Optimization finished!")
     
     #Test Model
-    trainAssignment = sess.run([assignment],feed_dict={points:data})
+    trainAssignment,trainCentroids = sess.run([assignment,centroids],feed_dict={points:data})
     validAssignment,validLoss = sess.run([assignment,loss],feed_dict={points:val_data})
     print("Validation Loss: " +str(validLoss))
     clusterPct = np.zeros(K)
     for i in range(valid_batch):
         clusterPct[validAssignment[i]]+=1
-    clusterPct/= valid_batch
+    clusterPct*=100/valid_batch
     for i in range(K):
-        print("Cluster"+str(i+1)+": "+str(clusterPct[i]))
+        print("Cluster"+str(i+1)+": "+"{0:.2f}".format(round(clusterPct[i],2))+"%")
 
 #Print out plot
 if D==2:
@@ -93,8 +93,9 @@ if D==2:
     #Plot 1 - 2D Scatter
     plt.subplot(211)
     c_assignment = np.asarray(trainAssignment,dtype=np.float32).reshape(np.shape(data[:,0]))
-    plt.scatter(data[:,0],data[:,1],c=c_assignment,cmap='jet')
-    plt.title("Kmeans with K = "+str(K))
+    plt.scatter(data[:,0],data[:,1],c=c_assignment,cmap='jet',marker='.')
+    plt.scatter(trainCentroids[:,0],trainCentroids[:,1],c='k',marker = 'o')
+    plt.title("Kmeans Learning with K = "+str(K))
     plt.ylabel('x1')
     plt.xlabel('x2')
     
@@ -114,7 +115,7 @@ else:
     plt.plot(x_axis,trainLoss,color='c',linewidth=2.0,label="Training")
     plt.ylabel('Loss')
     plt.xlabel('Epochs')
-    plt.title("Kmeans with K = "+str(K))
+    plt.title("Kmeans Learning with K = "+str(K))
     plt.legend()
     
     
