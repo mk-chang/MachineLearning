@@ -9,7 +9,7 @@ data = np.load('data100D.npy')
 [num_pts, dim] = np.shape(data)
 
 is_valid = 1
-run_kmeans = 1
+run_kmeans = 1 # set to 1 if want to run both kmeans and MoG
 
 # For Validation set
 if is_valid:
@@ -50,7 +50,6 @@ def log_GaussPDF(X, mu, sigma):  #logP(X|z)
     # log Gaussian PDF N X K
     
     D = X.shape[1]    
-#    D = 100
     sigma = tf.transpose(sigma) # 1xK
     distance = distanceFunc(X,mu) # NxK
 #    print(distance.get_shape())
@@ -59,8 +58,6 @@ def log_GaussPDF(X, mu, sigma):  #logP(X|z)
     part2 =  -1* (tf.multiply(D/2,tf.log(2*np.pi*tf.square(sigma)))) # 1xK
 
     logpdf = tf.add(part1, part2) 
-    
-    
 #    print(logpdf.get_shape())
     
     return logpdf
@@ -84,12 +81,6 @@ def log_posterior(log_PDF, log_pi):  #logP(z|X)
 #    print(log_pst.get_shape)
     return log_pst
 
-#%% loss likelihood
-#def log_loss(X, mu, sigma):
-#    log_pdf = log_GaussPDF(X, mu, sigma)
-    
-    
-
 
 #%% build graph and train model
 
@@ -99,18 +90,18 @@ def log_posterior(log_PDF, log_pi):  #logP(z|X)
 #Reset to defaultgraph
 tf.reset_default_graph()
 D = data.shape[1]
-K = 20 #Number of clusters
+K = 15 #Number of clusters
 LEARNING_RATE = 0.01
 MAX_ITERS = 1000
 
 
 
 points = tf.placeholder(dtype=tf.float32, shape=[None,D],name='points')
-
 centroid_init = tf.truncated_normal(shape=[K,D],dtype = tf.float32)
 sigma_init = tf.truncated_normal(shape=[K,1],dtype = tf.float32)
 centroids = tf.get_variable(dtype = tf.float32,initializer = centroid_init, name = "centroids")
-distances = distanceFunc(points,centroids)
+
+distances = distanceFunc(points,centroids) # for kmeans only
 
 log_pi = hlp.logsoftmax(tf.Variable(tf.random_normal([K,1],dtype = tf.float32)))
 
@@ -128,10 +119,10 @@ log_loss = hlp.reduce_logsumexp(log_pdf + log_pi,reduction_indices=1)
 
 # loss and optimizer for MoG
 
-loss = tf.reduce_sum(-1*log_loss)
+loss = tf.reduce_sum(-1*log_loss) # negative log loss
 optimizer = tf.train.AdamOptimizer(LEARNING_RATE, beta1=0.9,beta2=0.99,epsilon=1e-5).minimize(loss)
 
-assignment = tf.argmax(log_pdf,axis=1) # Nx
+assignment = tf.argmax(log_pdf,axis=1) # Nx (10000,)
 print("assignment shape:"+str(assignment.get_shape()))
 
 
@@ -161,18 +152,19 @@ with tf.Session() as sess:
             opt_kmeans,current_trainLoss_kmeans = sess.run([optimizer_kmeans,loss_kmeans], feed_dict={points:data})
             trainLoss_kmeans.append(current_trainLoss_kmeans)
         
-    print(centroids.eval())
-    print(good_sigma.eval())
+    print(centroids.eval()) # print assigned centroid
+    print(good_sigma.eval()) # print final sigma
     print("Optimization finished!")
-#    #Test Model
+    
+    #Test Model
+    # Assign label to dataset
     trainAssignment = sess.run([assignment],feed_dict={points:data})
 
-    if (is_valid ==1):
+    # if has valid data
+    if (is_valid ==1): 
         #MoG
         validAssignment,validLoss = sess.run([assignment,loss],feed_dict={points:val_data})
-
         print("Validation Loss MoG: " +str(validLoss))
-
         clusterPct = np.zeros(K)
         for i in range(valid_batch):
             clusterPct[validAssignment[i]]+=1
