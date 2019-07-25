@@ -1,2 +1,2 @@
 # MachineLearning
-ECE421 Machine Learning Assignments with Yuchen
+Machine Learning Projects Using Linear Regression, Logistic Regression, Neural Networks, GMM, Kmeans
